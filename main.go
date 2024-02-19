@@ -1,15 +1,17 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
+	"os"
 	"regexp"
-	"errors"
 )
 
 const (
-	httpProtVer = "HTTP/1.1"
-	srvr    = "matts server"
+	httpProtVer  = "HTTP/1.1"
+	srvr         = "matts server"
+	rootFilePath = "/www/http/src"
 )
 
 type HTTPResponse struct {
@@ -19,51 +21,82 @@ type HTTPResponse struct {
 	body        string
 }
 
-
-
 type request struct {
 	identity net.Conn
-	method string
+	method   string
 	resource string
-	httpVer string
+	httpVer  string
+}
+
+func fileOrPathExists(resource string) bool {
+	fullPath := rootFilePath + resource
+	_, err := os.Open(fullPath)
+
+	if err != nil {
+		log.Panicln("error!", err)
+		return false
+	}
+
+	return true
 
 }
 
-func fileOrPathExists(resource string) bool{
-	return false
+func buildResponse(responseObj *HTTPResponse) []byte {
+	respString := ""
+
+	return []byte(respString)
 }
 
-func handleRequest(reqChan chan *request){
+func handleRequest(reqChan chan *request) {
+	req := <-reqChan
+	conn := req.identity
+	response := &HTTPResponse{}
 
-	/*TODO
-	
-	*/
+	if !fileOrPathExists(req.resource) {
+		response.respCode = "404 Not Found"
+		conn.Write(buildResponse(response))
+		conn.Close()
+	} else {
+		response.respCode = "200 OK"
+	}
 }
 
 func parseRequest(conn net.Conn, inputStream *[]byte) (*request, error) {
-	
-	req := &request{identity: conn}
-	expressions := []string{`^(GET|POST|PUT|DELETE|OPTIONS)`, `\/[^\s]+`, `HTTP/(\d\.\d)$`}
-	
+
+	req := &request{identity: conn, method: "", resource: "", httpVer: ""}
+	expressions := []string{`^(GET|POST|PUT|DELETE|OPTIONS)`, `\s\/[^\s]+`, `HTTP\/[^\s]+`}
+
 	for i := range expressions {
 		re := regexp.MustCompile(expressions[i])
 		switch i {
 		case 0:
-			req.method = string(re.Find(*inputStream))
-		case 1:
-			req.resource = string(re.Find(*inputStream))
-		case 2:
-			version := string(re.Find(*inputStream))
-			if version != httpProtVer{
-				return nil , errors.New("can not accept requests from this version of http")
+
+			method := string(re.Find(*inputStream))
+			if method != "GET" {
+				return nil, errors.New("server does not support this request type")
 			}
-			req.httpVer = string(re.Find(*inputStream))
-		
+			req.method = string(re.Find(*inputStream))
+
+		case 1:
+
+			resource := string(re.Find(*inputStream))
+			req.resource = resource
+
+		case 2:
+
+			version := string(re.Find(*inputStream))
+
+			if version != httpProtVer {
+				return nil, errors.New("can not accept requests from this version of http")
+			}
+			req.httpVer = version
+
 		}
 
 	}
+
 	return req, nil
-}	
+}
 
 func handleConnection(conn net.Conn, reqChan chan *request) {
 	inputStream := make([]byte, 1042)
@@ -76,8 +109,8 @@ func handleConnection(conn net.Conn, reqChan chan *request) {
 
 	parsed, err := parseRequest(conn, &inputStream)
 
-	if err != nil{
-		log.Fatalln("FATAL" , err)
+	if err != nil {
+		log.Fatalln("FATAL", err)
 	}
 
 	reqChan <- parsed
@@ -94,7 +127,7 @@ func main() {
 		log.Fatal("can not listen...closing connection", err)
 	}
 
-	reqChan := make(chan *request)
+	reqChan := make(chan *request) //request channel
 
 	for {
 
