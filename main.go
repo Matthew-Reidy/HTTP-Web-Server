@@ -14,7 +14,7 @@ const (
 	port    = 8080
 )
 
-func openDoc(document string) string {
+func openDoc(document string) (string, string) {
 	file, err := os.Open("www/" + document)
 
 	fileContents := make([]byte, 150)
@@ -27,15 +27,15 @@ func openDoc(document string) string {
 
 	file.Close()
 
-	return string(fileContents[0:n])
+	return string(fileContents[0:n]), "200 OK"
 
 }
 
 func handleResponse(connCh chan net.Conn) {
 	conn := <-connCh
 	currTime := time.Now()
-	file := openDoc("index.html")
-	conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", currTime.Format("Sat, 06 Feb 2024 12:00:00"), len(file), file)))
+	file, respCode := openDoc("index.html")
+	conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
 	conn.Close()
 
 }
@@ -61,7 +61,9 @@ func main() {
 	if err != nil {
 		log.Fatal("can not listen...closing connection", err)
 	}
+
 	connCh := make(chan net.Conn)
+
 	for {
 
 		conn, err := ln.Accept()
