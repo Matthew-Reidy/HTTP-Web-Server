@@ -5,14 +5,18 @@ import (
 	"log"
 	"net"
 	"os"
+	"regexp"
 	"time"
 )
 
-const (
-	httpVer = "HTTP/1.1"
-	rateLim = 10
-	port    = 8080
-)
+const port = 8080
+
+type request struct {
+	conn     net.Conn
+	method   string
+	resource string
+	httpVer  string
+}
 
 func openDoc(document string) (string, string) {
 	file, err := os.Open("www/" + document)
@@ -20,7 +24,7 @@ func openDoc(document string) (string, string) {
 	fileContents := make([]byte, 150)
 
 	if err != nil {
-		log.Panicln("Can not opne file!", err)
+		log.Panicln("Can not open file!", err)
 
 	}
 	n, _ := file.Read(fileContents)
@@ -31,16 +35,33 @@ func openDoc(document string) (string, string) {
 
 }
 
-func handleResponse(connCh chan net.Conn) {
-	conn := <-connCh
+func handleResponse(connCh chan request) {
+	req := <-connCh
+
+	conn := req.conn
 	currTime := time.Now()
-	file, respCode := openDoc("index.html")
-	conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
-	conn.Close()
+
+	if req.method == "GET" {
+
+		file, respCode := openDoc("index.html")
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
+		conn.Close()
+
+	} else {
+		conn.Close()
+	}
 
 }
 
-func handleRequest(conn net.Conn, connCh chan net.Conn) {
+func parseHTTPreq(req string) []string {
+
+	r, _ := regexp.Compile(`^(GET) (\S+) (HTTP\/1\.1)$`)
+	matches := r.FindStringSubmatch(req)
+
+	return matches[1:]
+}
+
+func handleRequest(conn net.Conn, connCh chan request) {
 
 	requestStream := make([]byte, 1042)
 
@@ -49,7 +70,15 @@ func handleRequest(conn net.Conn, connCh chan net.Conn) {
 	if err != nil {
 		log.Panicln(err, "error in reading request")
 	}
-	connCh <- conn
+
+	parsed := parseHTTPreq(string(requestStream))
+
+	if len(parsed) == 0 || parsed[2] != "HTTP/1.1" {
+		connCh <- request{conn: conn, method: parsed[0], resource: "error!"}
+	} else {
+		connCh <- request{conn: conn, method: parsed[0], resource: parsed[1], httpVer: parsed[2]}
+	}
+
 }
 
 func main() {
@@ -62,7 +91,7 @@ func main() {
 		log.Fatal("can not listen...closing connection", err)
 	}
 
-	connCh := make(chan net.Conn)
+	connCh := make(chan request)
 
 	for {
 
