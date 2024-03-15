@@ -35,12 +35,13 @@ func openDoc(document string) (string, string) {
 	fileContents := make([]byte, 150)
 
 	if err != nil {
-		log.Panicln("Can not open file!", err)
+		log.Panicln(err)
 
+		return "<h1>resource not found!</h1>", "404 Not Found"
 	}
-	n, _ := file.Read(fileContents)
+	defer file.Close()
 
-	file.Close()
+	n, _ := file.Read(fileContents)
 
 	return string(fileContents[0:n]), "200 OK"
 
@@ -48,7 +49,8 @@ func openDoc(document string) (string, string) {
 
 func handleResponse(connCh chan request) {
 	req := <-connCh
-
+	//todo: add logic to handle 403 responses, 404 responses
+	//todo: add some sort of functionality to identify js and css files used by the HTML and send with the
 	conn := req.conn
 	currTime := time.Now()
 
@@ -58,6 +60,7 @@ func handleResponse(connCh chan request) {
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
 		conn.Close()
 	} else {
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 403 Forbidden\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:25\r\n\r\n<h1>forbidden!</h1>", currTime)))
 		conn.Close()
 	}
 
@@ -78,17 +81,24 @@ func handleRequest(conn net.Conn, connCh chan request) {
 
 	if _, exists := requestorProfile[conn.RemoteAddr().String()]; !exists {
 
-		requestorProfile[conn.RemoteAddr().String()] = profile{strikes: 0, lastmessage: time.Now(), isBanned: false, bannedTime: time.Time{}}
+		requestorProfile[conn.RemoteAddr().String()] = profile{
+			strikes:     0,
+			lastmessage: time.Now(),
+			isBanned:    false,
+			bannedTime:  time.Time{},
+		}
 
 	} else {
 		if banCheck := requestorProfile[conn.RemoteAddr().String()].isBanned; banCheck {
+			//todo: add some sort of unban logic
+
 			conn.Close()
 		} else {
 			currentTime := time.Now()
 			profile := requestorProfile[conn.RemoteAddr().String()]
 			if currentTime.Sub(profile.lastmessage) <= (5 * time.Second) {
 				profile.strikes += 1
-				if profile.strikes >= 3 {
+				if profile.strikes >= strikeLimit {
 					profile.bannedTime = time.Now()
 					profile.isBanned = true
 					conn.Close()
@@ -97,15 +107,20 @@ func handleRequest(conn net.Conn, connCh chan request) {
 		}
 
 	}
-	_, err := conn.Read(requestStream)
+	n, err := conn.Read(requestStream)
 
 	if err != nil {
 		log.Panicln(err, "error in reading request")
 	}
 
-	parsed := parseHTTPreq(string(requestStream))
+	parsed := parseHTTPreq(string(requestStream[0:n]))
 	log.Println(parsed)
-	connCh <- request{conn: conn, method: "GET", resource: "/", httpVer: allowedHTTPVer}
+	connCh <- request{
+		conn:     conn,
+		method:   "GET",
+		resource: "/",
+		httpVer:  allowedHTTPVer,
+	}
 
 }
 
