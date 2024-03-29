@@ -24,14 +24,14 @@ type request struct {
 }
 
 type profile struct {
-	strikes     int //instances messages that are within 5 seconds of
-	lastmessage time.Time
-	isBanned    bool
-	bannedTime  time.Time
+	strikes     int       //instances messages that are within x seconds of eachother
+	lastmessage time.Time //last message or request made by a requestor
+	isBanned    bool      //boolean is user banned
+	bannedTime  time.Time //time of ban, used in unban logic
 }
 
 func openDoc(document string) (string, string) {
-	file, err := os.Open("www/" + document)
+	file, err := os.Open("www" + document)
 
 	fileContents := make([]byte, 150)
 
@@ -56,14 +56,15 @@ func handleResponse(connCh chan *request) {
 	currTime := time.Now()
 	defer conn.Close()
 
-	if req.method == "GET" {
+	if req.httpVer == allowedHTTPVer {
+		file, respCode := openDoc(req.resource)
+		if req.method == "GET" {
+			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
 
-		file, respCode := openDoc("index.html")
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
+		} else {
+			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 403 Forbidden\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:25\r\n\r\n<h1>forbidden!</h1>", currTime)))
 
-	} else {
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 403 Forbidden\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:25\r\n\r\n<h1>forbidden!</h1>", currTime)))
-
+		}
 	}
 
 }
