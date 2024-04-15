@@ -121,16 +121,12 @@ func handleRequest(conn net.Conn, connCh chan *request, requestorProfile map[str
 	}
 	n, err := conn.Read(requestStream)
 
-	if err != nil {
-		if err != io.EOF {
-			log.Panicln(err, "error in reading request")
-
-		}
-
+	if err != nil && err != io.EOF {
+		log.Panicln(err, "error in reading request")
 	}
 
 	parsed := parseHTTPreq(requestStream[:n])
-	log.Println(parsed)
+
 	connCh <- &request{
 		conn:     conn,
 		method:   parsed[1],
