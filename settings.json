@@ -1,0 +1,5 @@
+{
+    "strikelimit" : 10,
+    "port"           : 8080,
+	"allowedHTTPVer" : "HTTP/1.1"
+}

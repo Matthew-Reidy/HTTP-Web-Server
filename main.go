@@ -36,7 +36,7 @@ func openDoc(document string) (string, string) {
 	fileContents := make([]byte, 150)
 
 	if err != nil {
-		log.Panicln(err)
+		log.Println(err)
 
 		return "<h1>resource not found!</h1>", "404 Not Found"
 	}
@@ -83,6 +83,7 @@ func handleRequest(conn net.Conn, connCh chan *request, requestorProfile map[str
 	remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
 
 	if _, exists := requestorProfile[remoteAddr.IP.String()]; !exists {
+
 		log.Printf("%s added to profile list", remoteAddr.IP.String())
 		requestorProfile[remoteAddr.IP.String()] = &profile{
 			strikes:     0,
@@ -92,6 +93,7 @@ func handleRequest(conn net.Conn, connCh chan *request, requestorProfile map[str
 		}
 
 	} else {
+
 		log.Printf("%s is visiting again from the profile list", remoteAddr.IP.String())
 		profile := requestorProfile[remoteAddr.IP.String()]
 
@@ -102,18 +104,26 @@ func handleRequest(conn net.Conn, connCh chan *request, requestorProfile map[str
 			return
 
 		} else {
+
 			currentTime := time.Now()
+
 			if currentTime.Sub(profile.lastmessage) <= 5*time.Second {
+
 				log.Printf("%s strike! num of strikes! %d", remoteAddr.IP.String(), requestorProfile[remoteAddr.IP.String()].strikes)
 				profile.strikes++
+
 				if profile.strikes >= strikeLimit {
+
 					profile.bannedTime = time.Now()
 					profile.isBanned = true
 					conn.Close()
 					return
+
 				}
 			} else {
+
 				profile.strikes = 0
+
 			}
 
 		}
