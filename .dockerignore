@@ -1,0 +1,19 @@
+README.md
+git
+.gitignore
+.svn
+
+# Ignore Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore editor and IDE files
+.idea
+.vscode
+
+# Ignore Docker-related files and directories
+.dockerignore
+Dockerfile
