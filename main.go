@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -24,27 +25,58 @@ type request struct {
 }
 
 type profile struct {
-	strikes     int       //instances messages that are within x seconds of eachother
+	strikes     int64     //instances messages that are within x seconds of eachother
 	lastmessage time.Time //last message or request made by a requestor
 	isBanned    bool      //boolean is user banned
 	bannedTime  time.Time //time of ban, used in unban logic
 }
 
 func openDoc(document string) (string, string) {
-	file, err := os.Open("www" + document)
 
-	fileContents := make([]byte, 150)
+	pathway := "www" + document
 
-	if err != nil {
-		log.Println(err)
+	if _, err := os.Stat(pathway); !os.IsNotExist(err) {
 
-		return "<h1>resource not found!</h1>", "404 Not Found"
+		file, err := os.Open(pathway)
+
+		f, _ := file.Stat()
+
+		if err != nil {
+			log.Println("error! ", err)
+		}
+		defer file.Close()
+
+		reader := bufio.NewReader(file)
+
+		fileContents := make([]byte, f.Size())
+
+		n, readErr := reader.Read(fileContents)
+
+		if readErr != nil {
+			log.Println("error occured reading document! ", pathway, readErr)
+		}
+
+		return string(fileContents[:n]), "200 Ok"
+
+	} else {
+
+		file, err := os.Open("www/404.html")
+
+		if err != nil {
+			log.Println(err)
+		}
+		defer file.Close()
+
+		fileContent := make([]byte, 150)
+
+		n, readErr := file.Read(fileContent)
+
+		if readErr != nil {
+			log.Println("error occured reading document! ", pathway, readErr)
+		}
+
+		return string(fileContent[:n]), "404 Not Found"
 	}
-	defer file.Close()
-
-	n, _ := file.Read(fileContents)
-
-	return string(fileContents[0:n]), "200 OK"
 
 }
 

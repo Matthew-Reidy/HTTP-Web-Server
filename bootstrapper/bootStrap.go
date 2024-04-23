@@ -1,5 +1,0 @@
-package bootstrapper
-
-func begin() {
-
-}
