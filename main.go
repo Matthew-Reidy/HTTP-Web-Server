@@ -15,6 +15,8 @@ const (
 	port           = 8080
 	allowedHTTPVer = "HTTP/1.1"
 	strikeLimit    = 10
+	NotFound       = "404 Not Found"
+	Ok             = "200 OK"
 )
 
 type request struct {
@@ -56,7 +58,7 @@ func openDoc(document string) (string, string) {
 			log.Println("error occured reading document! ", pathway, readErr)
 		}
 
-		return string(fileContents[:n]), "200 Ok"
+		return string(fileContents[:n]), Ok
 
 	} else {
 
@@ -75,7 +77,7 @@ func openDoc(document string) (string, string) {
 			log.Println("error occured reading document! ", pathway, readErr)
 		}
 
-		return string(fileContent[:n]), "404 Not Found"
+		return string(fileContent[:n]), NotFound
 	}
 
 }
@@ -89,8 +91,9 @@ func handleResponse(connCh chan *request) {
 	defer conn.Close()
 
 	if req.httpVer == allowedHTTPVer {
-		file, respCode := openDoc(req.resource)
+
 		if req.method == "GET" {
+			file, respCode := openDoc(req.resource)
 			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\nDate:%+v\r\nServer: Matts Srvr\r\nContent-Type:text/html\r\nContent-Length:%d\r\n\r\n%s", respCode, currTime, len(file), file)))
 
 		} else {
